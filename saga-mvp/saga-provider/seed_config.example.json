@@ -1,0 +1,36 @@
+{
+  "users": [
+    {
+      "uid": "alice",
+      "password": "alicepass123",
+      "agents": [
+        {
+          "name": "calendar_agent",
+          "device": "alice-agent-container",
+          "ip": "alice-agent",
+          "port": 9001,
+          "num_otks": 10,
+          "contact_policy": [
+            {"agents": "bob:calendar_agent", "budget": 15}
+          ]
+        }
+      ]
+    },
+    {
+      "uid": "bob",
+      "password": "bobpass123",
+      "agents": [
+        {
+          "name": "calendar_agent",
+          "device": "bob-agent-container",
+          "ip": "bob-agent",
+          "port": 9002,
+          "num_otks": 10,
+          "contact_policy": [
+            {"agents": "alice:calendar_agent", "budget": 15}
+          ]
+        }
+      ]
+    }
+  ]
+}
