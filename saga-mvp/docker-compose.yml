@@ -1,0 +1,33 @@
+version: "3.9"
+
+services:
+  mongo:
+    image: mongo:7
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - saga-net
+
+  provider:
+    build: ./saga-provider
+    depends_on:
+      - mongo
+    environment:
+      MONGO_URI: mongodb://mongo:27017
+      MONGO_DB: saga
+      PROVIDER_KEY_FILE: /keys/provider_signing_key.seed
+    volumes:
+      - ./certs:/certs:ro
+      - provider_keys:/keys
+    ports:
+      - "8443:8443"
+    networks:
+      - saga-net
+
+networks:
+  saga-net:
+    driver: bridge
+
+volumes:
+  mongo_data:
+  provider_keys:
