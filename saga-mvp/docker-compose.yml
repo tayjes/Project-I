@@ -24,6 +24,44 @@ services:
     networks:
       - saga-net
 
+  alice-agent:
+    build: ./agent
+    depends_on:
+      - provider
+    environment:
+      AGENT_UID: alice
+      AGENT_NAME: calendar_agent
+      AGENT_PORT: 9001
+      PROVIDER_URL: https://provider:8443
+      PROVIDER_VERIFY_TLS: "false"
+    volumes:
+      - ./certs/agent.crt:/certs/agent.crt:ro
+      - ./certs/agent.key:/certs/agent.key:ro
+      - ./saga-provider/seed-keys:/keys:ro
+    ports:
+      - "9001:9001"
+    networks:
+      - saga-net
+
+  bob-agent:
+    build: ./agent
+    depends_on:
+      - provider
+    environment:
+      AGENT_UID: bob
+      AGENT_NAME: calendar_agent
+      AGENT_PORT: 9002
+      PROVIDER_URL: https://provider:8443
+      PROVIDER_VERIFY_TLS: "false"
+    volumes:
+      - ./certs/agent.crt:/certs/agent.crt:ro
+      - ./certs/agent.key:/certs/agent.key:ro
+      - ./saga-provider/seed-keys:/keys:ro
+    ports:
+      - "9002:9002"
+    networks:
+      - saga-net
+
 networks:
   saga-net:
     driver: bridge

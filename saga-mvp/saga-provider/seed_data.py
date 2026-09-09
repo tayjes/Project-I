@@ -97,6 +97,7 @@ def register_agent(client: httpx.Client, signing_key: SigningKey, uid: str, pass
         print(f"  agent '{aid}' already registered, skipping (edit its policy separately -- see README)")
         return
     resp.raise_for_status()
+    provider_signature_hex = resp.json()["provider_signature_hex"]
     print(f"  registered agent '{aid}' with {len(otks)} OTKs and {len(agent_cfg.get('contact_policy', []))} policy rule(s)")
 
     keys_dir.mkdir(parents=True, exist_ok=True)
@@ -105,6 +106,10 @@ def register_agent(client: httpx.Client, signing_key: SigningKey, uid: str, pass
         json.dumps(
             {
                 "aid": aid,
+                "device": agent_cfg["device"],
+                "ip": agent_cfg["ip"],
+                "port": agent_cfg["port"],
+                "provider_signature_hex": provider_signature_hex,
                 "signing_key_seed_hex": signing_key.encode().hex(),
                 "pac_private_hex": bytes(pac).hex(),
                 "otk_private_hexes": [bytes(k).hex() for k in otk_privs],
@@ -138,7 +143,12 @@ def run(config: dict, keys_dir: Path, client: httpx.Client):
 def main():
     parser = argparse.ArgumentParser(description="Seed the SAGA Provider with users, agents, and contact policies")
     parser.add_argument("config", help="Path to a JSON config file (see seed_config.example.json)")
-    parser.add_argument("--keys-dir", default="seed-keys", help="Where to save/load generated private keys")
+    parser.add_argument(
+        "--keys-dir",
+        default=str(Path(__file__).resolve().parent / "seed-keys"),
+        help="Where to save/load generated private keys (default: seed-keys/ next to this script, "
+        "regardless of your current directory)",
+    )
     args = parser.parse_args()
 
     config = json.loads(Path(args.config).read_text())
