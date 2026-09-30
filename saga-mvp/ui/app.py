@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import httpx
 from fastapi import FastAPI, HTTPException
@@ -31,6 +31,16 @@ class RefreshRequest(BaseModel):
     num_otks: int = 10
 
 
+def _parse_iso(value: str) -> datetime:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise HTTPException(400, f"invalid ISO datetime: {value}") from exc
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
 def _agent(name: str) -> str:
     if name == "alice":
         return ALICE_URL
@@ -46,36 +56,65 @@ async def _get_events(name: str, start: str, end: str):
         return r.json()
 
 
-def _event_interval(event: dict):
+def _event_interval(event: dict, default_tz) -> tuple[datetime, datetime] | None:
     start = event.get("start", {})
     end = event.get("end", {})
+
+    # Google Calendar returns timed events as dateTime and all-day events
+    # as date.  date-only values are timezone-naive, so attach the same
+    # timezone as the requested availability window before comparing.
     s = start.get("dateTime") or start.get("date")
     e = end.get("dateTime") or end.get("date")
     if not s or not e:
         return None
+
     try:
-        return datetime.fromisoformat(s.replace("Z", "+00:00")), datetime.fromisoformat(e.replace("Z", "+00:00"))
+        event_start = datetime.fromisoformat(s.replace("Z", "+00:00"))
+        event_end = datetime.fromisoformat(e.replace("Z", "+00:00"))
     except ValueError:
         return None
 
+    if event_start.tzinfo is None:
+        event_start = event_start.replace(tzinfo=default_tz)
+    if event_end.tzinfo is None:
+        event_end = event_end.replace(tzinfo=default_tz)
+
+    return event_start, event_end
+
 
 def _free_slots(start: str, end: str, alice_events: list, bob_events: list, duration_minutes: int = 30):
-    window_start = datetime.fromisoformat(start.replace("Z", "+00:00"))
-    window_end = datetime.fromisoformat(end.replace("Z", "+00:00"))
+    window_start = _parse_iso(start)
+    window_end = _parse_iso(end)
+
+    if window_end <= window_start:
+        raise HTTPException(400, "end must be after start")
+    if duration_minutes < 1:
+        raise HTTPException(400, "duration must be at least 1 minute")
+
     busy = []
     for event in alice_events + bob_events:
-        interval = _event_interval(event)
+        interval = _event_interval(event, window_start.tzinfo)
         if interval:
-            busy.append(interval)
+            event_start, event_end = interval
+            # Ignore malformed/zero-length intervals.
+            if event_end > event_start:
+                busy.append((event_start, event_end))
+
     slots = []
     cursor = window_start
     duration = timedelta(minutes=duration_minutes)
+
     while cursor + duration <= window_end and len(slots) < 12:
         candidate_end = cursor + duration
-        conflict = any(candidate_start < candidate_end and candidate_end > candidate_start for candidate_start, candidate_end in busy)
+        conflict = any(
+            busy_start < candidate_end and candidate_start < busy_end
+            for busy_start, busy_end in busy
+            for candidate_start, candidate_end in [(cursor, candidate_end)]
+        )
         if not conflict:
             slots.append({"start": cursor.isoformat(), "end": candidate_end.isoformat()})
         cursor += duration
+
     return slots
 
 
@@ -94,6 +133,12 @@ async def health():
 
 @app.get("/api/availability")
 async def availability(start: str, end: str):
+    # Validate the requested window before making calendar calls.
+    window_start = _parse_iso(start)
+    window_end = _parse_iso(end)
+    if window_end <= window_start:
+        raise HTTPException(400, "end must be after start")
+
     alice_events = await _get_events("alice", start, end)
     bob_events = await _get_events("bob", start, end)
     return {
@@ -108,11 +153,21 @@ async def create_meeting(req: MeetingRequest):
     if req.initiator not in ("alice", "bob"):
         raise HTTPException(400, "initiator must be alice or bob")
 
+    start_dt = _parse_iso(req.start)
+    end_dt = _parse_iso(req.end)
+    if end_dt <= start_dt:
+        raise HTTPException(400, "end must be after start")
+
     alice_events = await _get_events("alice", req.start, req.end)
     bob_events = await _get_events("bob", req.start, req.end)
-    if _free_slots(req.start, req.end, alice_events, bob_events, duration_minutes=max(
-        1, int((datetime.fromisoformat(req.end.replace("Z", "+00:00")) - datetime.fromisoformat(req.start.replace("Z", "+00:00"))).total_seconds() // 60)
-    )) == []:
+    duration_minutes = max(1, int((end_dt - start_dt).total_seconds() // 60))
+    if _free_slots(
+        req.start,
+        req.end,
+        alice_events,
+        bob_events,
+        duration_minutes=duration_minutes,
+    ) == []:
         raise HTTPException(409, "the selected time overlaps an existing event on Alice or Bob's calendar")
 
     target = "bob" if req.initiator == "alice" else "alice"
