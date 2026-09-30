@@ -75,3 +75,37 @@ networks:
 volumes:
   mongo_data:
   provider_keys:
+
+  seed-admin:
+    build: ./saga-provider
+    depends_on:
+      - provider
+    command: ["uvicorn", "seed_api:app", "--host", "0.0.0.0", "--port", "8081"]
+    environment:
+      PROVIDER_URL: https://provider:8443
+      PROVIDER_VERIFY_TLS: "false"
+      SEED_ADMIN_TOKEN: ${SEED_ADMIN_TOKEN:-change-me}
+      SEED_CONFIG_PATH: /config/seed_config.json
+      SEED_KEYS_DIR: /keys
+    volumes:
+      - ./saga-provider/seed-keys:/keys
+      - ./saga-provider/seed_config.json:/config/seed_config.json:ro
+    networks:
+      - saga-net
+
+  ui:
+    build: ./ui
+    depends_on:
+      - alice-agent
+      - bob-agent
+      - seed-admin
+    environment:
+      ALICE_AGENT_URL: https://alice-agent:9001
+      BOB_AGENT_URL: https://bob-agent:9002
+      AGENT_VERIFY_TLS: "false"
+      SEED_ADMIN_URL: http://seed-admin:8081
+      SEED_ADMIN_TOKEN: ${SEED_ADMIN_TOKEN:-change-me}
+    ports:
+      - "8080:8080"
+    networks:
+      - saga-net
