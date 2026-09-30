@@ -84,7 +84,7 @@ volumes:
     environment:
       PROVIDER_URL: https://provider:8443
       PROVIDER_VERIFY_TLS: "false"
-      SEED_ADMIN_TOKEN: ${SEED_ADMIN_TOKEN:-change-me}
+      SEED_ADMIN_TOKEN: ${SEED_ADMIN_TOKEN:?set SEED_ADMIN_TOKEN}
       SEED_CONFIG_PATH: /config/seed_config.json
       SEED_KEYS_DIR: /keys
     volumes:
@@ -104,7 +104,9 @@ volumes:
       BOB_AGENT_URL: https://bob-agent:9002
       AGENT_VERIFY_TLS: "false"
       SEED_ADMIN_URL: http://seed-admin:8081
-      SEED_ADMIN_TOKEN: ${SEED_ADMIN_TOKEN:-change-me}
+      SEED_ADMIN_TOKEN: ${SEED_ADMIN_TOKEN:?set SEED_ADMIN_TOKEN}
+      ALICE_EMAIL: ${ALICE_EMAIL:-}
+      BOB_EMAIL: ${BOB_EMAIL:-}
     ports:
       - "8080:8080"
     networks:
