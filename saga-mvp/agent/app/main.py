@@ -15,7 +15,7 @@ import logging
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from . import config, crypto, provider_client, session_store, calendar_tool
+from . import config, crypto, provider_client, peer_client, session_store, calendar_tool
 from .keys import load_identity
 
 logging.basicConfig(level=logging.INFO)
