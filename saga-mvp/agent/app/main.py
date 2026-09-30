@@ -15,7 +15,7 @@ import logging
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from . import config, crypto, provider_client, session_store
+from . import config, crypto, provider_client, session_store, calendar_tool
 from .keys import load_identity
 
 logging.basicConfig(level=logging.INFO)
@@ -100,11 +100,38 @@ async def message(req: MessageRequest):
 
 def handle_task_message(from_aid: str, payload: dict) -> dict:
     """
-    Placeholder for actual agent logic. Next step: replace this with a
-    smolagents CodeAgent call that reasons about the payload and uses the
-    Google Calendar tool. For now it echoes, so the SAGA transport layer
-    (handshake, token limits, expiry) can be verified independently of any
-    LLM behavior.
+    Actual agent task logic. Currently handles one action type:
+    "schedule_meeting" -- creates a real event on this agent's owner's
+    Google Calendar. Anything else falls back to an echo, so the SAGA
+    transport layer can still be exercised without touching Calendar.
+
+    Expected payload for scheduling:
+        {
+            "action": "schedule_meeting",
+            "summary": "Alice & Bob sync",
+            "start": "2026-09-10T14:00:00+05:30",
+            "end": "2026-09-10T14:30:00+05:30",
+            "attendees": ["alice@example.com"]   # optional
+        }
     """
     log.info("received task message from %s: %s", from_aid, payload)
+
+    if payload.get("action") == "schedule_meeting":
+        try:
+            event = calendar_tool.create_event(
+                summary=payload["summary"],
+                start_iso=payload["start"],
+                end_iso=payload["end"],
+                attendees=payload.get("attendees"),
+            )
+            log.info("created calendar event %s for %s", event.get("id"), identity.aid)
+            return {
+                "status": "scheduled",
+                "event_id": event.get("id"),
+                "event_link": event.get("htmlLink"),
+            }
+        except Exception as e:
+            log.exception("calendar write failed")
+            return {"status": "error", "detail": str(e)}
+
     return {"echo": payload, "handled_by": identity.aid}

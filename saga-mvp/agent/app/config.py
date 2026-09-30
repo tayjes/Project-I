@@ -15,3 +15,7 @@ KEY_FILE = KEYS_DIR / f"{AGENT_UID}__{AGENT_NAME}.json"
 # SAGA paper's own example values (Section on the security add-on): 5 min / limited requests.
 TOKEN_LIFETIME_SECONDS = int(os.getenv("TOKEN_LIFETIME_SECONDS", "300"))
 TOKEN_MAX_REQUESTS = int(os.getenv("TOKEN_MAX_REQUESTS", "50"))
+
+# Google Calendar tool -- each agent writes to its own owner's calendar.
+GOOGLE_SERVICE_ACCOUNT_FILE = os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE", "/secrets/gcal-service-account.json")
+GOOGLE_CALENDAR_ID = os.getenv("GOOGLE_CALENDAR_ID", "primary")

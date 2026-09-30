@@ -34,10 +34,13 @@ services:
       AGENT_PORT: 9001
       PROVIDER_URL: https://provider:8443
       PROVIDER_VERIFY_TLS: "false"
+      GOOGLE_SERVICE_ACCOUNT_FILE: /secrets/gcal-service-account.json
+      GOOGLE_CALENDAR_ID: "tayjes2005@gmail.com"  # <-- replace with the real calendar ID
     volumes:
       - ./certs/agent.crt:/certs/agent.crt:ro
       - ./certs/agent.key:/certs/agent.key:ro
       - ./saga-provider/seed-keys:/keys:ro
+      - ./secrets/gcal-service-account.json:/secrets/gcal-service-account.json:ro
     ports:
       - "9001:9001"
     networks:
@@ -53,10 +56,13 @@ services:
       AGENT_PORT: 9002
       PROVIDER_URL: https://provider:8443
       PROVIDER_VERIFY_TLS: "false"
+      GOOGLE_SERVICE_ACCOUNT_FILE: /secrets/gcal-service-account.json
+      GOOGLE_CALENDAR_ID: "tayjes2005@gmail.com"  # <-- replace with the real calendar ID (can be the same as Alice's for a demo with one Google account)
     volumes:
       - ./certs/agent.crt:/certs/agent.crt:ro
       - ./certs/agent.key:/certs/agent.key:ro
       - ./saga-provider/seed-keys:/keys:ro
+      - ./secrets/gcal-service-account.json:/secrets/gcal-service-account.json:ro
     ports:
       - "9002:9002"
     networks:
