@@ -41,6 +41,18 @@ class MessageRequest(BaseModel):
     payload: dict
 
 
+class CalendarEventRequest(BaseModel):
+    summary: str
+    start: str
+    end: str
+    attendees: list[str] | None = None
+
+
+class SendRequest(BaseModel):
+    target_aid: str
+    payload: dict
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok", "aid": identity.aid}
@@ -76,6 +88,32 @@ async def token_request(req: TokenRequest):
     )
 
     return {"token_hex": token_hex, "expires_at": token["expires_at"], "qmax": token["qmax"]}
+
+
+
+@app.get("/calendar/events")
+async def calendar_events(time_min: str, time_max: str):
+    try:
+        return calendar_tool.list_events(time_min, time_max, max_results=100)
+    except Exception as e:
+        raise HTTPException(502, f"calendar read failed: {e}")
+
+
+@app.post("/calendar/create")
+async def calendar_create(req: CalendarEventRequest):
+    try:
+        return calendar_tool.create_event(req.summary, req.start, req.end, req.attendees)
+    except Exception as e:
+        raise HTTPException(502, f"calendar write failed: {e}")
+
+
+@app.post("/saga/send")
+async def saga_send(req: SendRequest):
+    try:
+        return peer_client.send_message(identity, req.target_aid, req.payload)
+    except Exception as e:
+        log.exception("peer request failed")
+        raise HTTPException(502, f"peer request failed: {e}")
 
 
 @app.post("/saga/message")

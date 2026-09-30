@@ -22,6 +22,7 @@ from app.crypto import PROVIDER_VERIFY_KEY_HEX, provider_sign, verify_signature
 from app.db import agents_col, ensure_indexes, users_col
 from app.models import (
     AgentRegisterRequest,
+    OTKRefreshRequest,
     DeactivateRequest,
     LookupResponse,
     PolicyUpdateRequest,
