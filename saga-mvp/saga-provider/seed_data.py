@@ -121,6 +121,37 @@ def register_agent(client: httpx.Client, signing_key: SigningKey, uid: str, pass
     print(f"  saved private keys -> {key_file}")
 
 
+def refresh_agent_otks(client: httpx.Client, signing_key: SigningKey, uid: str, password: str, agent_cfg: dict, keys_dir: Path, num_otks: int | None = None):
+    """Generate a fresh OTK pool, atomically replace the Provider pool, and update the agent's private key file."""
+    name = agent_cfg["name"]
+    aid = f"{uid}:{name}"
+    count = num_otks or agent_cfg.get("num_otks", 10)
+    otk_privs = [PrivateKey.generate() for _ in range(count)]
+    otks = [bytes(k.public_key).hex() for k in otk_privs]
+    otk_signatures = [signing_key.sign(f"{aid}:{o}".encode()).signature.hex() for o in otks]
+
+    resp = client.post(
+        f"/agents/{aid}/otks/refresh",
+        json={
+            "uid": uid,
+            "password": password,
+            "otks": otks,
+            "otk_signatures": otk_signatures,
+        },
+    )
+    resp.raise_for_status()
+
+    key_file = keys_dir / f"{uid}__{name}.json"
+    if not key_file.exists():
+        raise FileNotFoundError(f"Cannot refresh {aid}: missing {key_file}")
+    data = json.loads(key_file.read_text())
+    data["otk_private_hexes"] = [bytes(k).hex() for k in otk_privs]
+    key_file.write_text(json.dumps(data, indent=2))
+    key_file.chmod(0o600)
+    print(f"  refreshed {aid}: {len(otks)} OTKs -> {key_file}")
+    return resp.json()
+
+
 def run(config: dict, keys_dir: Path, client: httpx.Client):
     for user_cfg in config["users"]:
         uid = user_cfg["uid"]
